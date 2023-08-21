@@ -298,6 +298,8 @@ devture_systemd_service_manager_services_list_auto: |
     +
     ([{'name': 'matrix-client-element.service', 'priority': 2000, 'groups': ['matrix', 'clients', 'element', 'client-element']}] if matrix_client_element_enabled else [])
     +
+    ([{'name': 'matrix-client-thirdroom.service', 'priority': 2000, 'groups': ['matrix', 'clients', 'thirdroom', 'client-thirdroom']}] if matrix_client_thirdroom_enabled else [])
+    +
     ([{'name': 'matrix-client-hydrogen.service', 'priority': 2000, 'groups': ['matrix', 'clients', 'hydrogen', 'client-hydrogen']}] if matrix_client_hydrogen_enabled else [])
     +
     ([{'name': ('matrix-' + matrix_homeserver_implementation + '.service'), 'priority': 1000, 'groups': ['matrix', 'homeservers', matrix_homeserver_implementation]}] if matrix_homeserver_enabled else [])
@@ -2691,6 +2693,7 @@ matrix_nginx_proxy_proxy_matrix_client_redirect_root_uri_to_domain: "{{ matrix_s
 
 matrix_nginx_proxy_proxy_matrix_enabled: true
 matrix_nginx_proxy_proxy_element_enabled: "{{ matrix_client_element_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] }}"
+matrix_nginx_proxy_proxy_thirdroom_enabled: "{{ matrix_client_thirdroom_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] }}"
 matrix_nginx_proxy_proxy_hydrogen_enabled: "{{ matrix_client_hydrogen_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] }}"
 matrix_nginx_proxy_proxy_cinny_enabled: "{{ matrix_client_cinny_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] }}"
 matrix_nginx_proxy_proxy_buscarron_enabled: "{{ matrix_bot_buscarron_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] }}"
@@ -2790,6 +2793,8 @@ matrix_nginx_proxy_systemd_wanted_services_list: |
     +
     (['matrix-client-element.service'] if matrix_client_element_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] else [])
     +
+    (['matrix-client-thirdroom.service'] if matrix_client_thirdroom_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] else [])
+    +
     (['matrix-client-hydrogen.service'] if matrix_client_hydrogen_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] else [])
     +
     ([(grafana_identifier + '.service')] if grafana_enabled and matrix_playbook_reverse_proxy_type in ['playbook-managed-nginx', 'other-nginx-non-container'] else [])
@@ -2816,6 +2821,8 @@ matrix_ssl_domains_to_obtain_certificates_for: |
     ([matrix_server_fqn_matrix])
     +
     ([matrix_server_fqn_element] if matrix_client_element_enabled else [])
+    +
+    ([matrix_server_fqn_thirdroom] if matrix_client_thirdroom_enabled else [])
     +
     ([matrix_nginx_proxy_proxy_riot_compat_redirect_hostname] if matrix_nginx_proxy_proxy_riot_compat_redirect_enabled else [])
     +
@@ -3346,6 +3353,62 @@ matrix_client_element_jitsi_preferred_domain: "{{ matrix_server_fqn_jitsi if jit
 ######################################################################
 #
 # /matrix-client-element
+#
+######################################################################
+
+######################################################################
+#
+# matrix-client-thirdroom
+#
+######################################################################
+
+# By default, this playbook installs the Thirdroom web UI on the `matrix_server_fqn_thirdroom` domain.
+# If you wish to connect to your Matrix server by other means, you may wish to disable this.
+matrix_client_thirdroom_enabled: false
+
+matrix_client_thirdroom_container_image_self_build: "{{ matrix_architecture not in ['arm64', 'amd64'] }}"
+
+# Normally, matrix-nginx-proxy is enabled and nginx can reach Element over the container network.
+# If matrix-nginx-proxy is not enabled, or you otherwise have a need for it, you can expose
+# the Element HTTP port to the local host.
+matrix_client_thirdroom_container_http_host_bind_port: "{{ (matrix_playbook_service_host_bind_interface_prefix ~ '8765') if matrix_playbook_service_host_bind_interface_prefix else '' }}"
+
+matrix_client_thirdroom_container_network: "{{ matrix_nginx_proxy_container_network if matrix_playbook_reverse_proxy_type == 'playbook-managed-nginx' else 'matrix-client-thirdroom' }}"
+
+matrix_client_thirdroom_container_additional_networks: "{{ [matrix_playbook_reverse_proxyable_services_additional_network] if matrix_playbook_reverse_proxyable_services_additional_network else [] }}"
+
+matrix_client_thirdroom_container_labels_traefik_enabled: "{{ matrix_playbook_reverse_proxy_type in ['playbook-managed-traefik', 'other-traefik-container'] }}"
+matrix_client_thirdroom_container_labels_traefik_docker_network: "{{ matrix_playbook_reverse_proxyable_services_additional_network }}"
+matrix_client_thirdroom_container_labels_traefik_entrypoints: "{{ devture_traefik_entrypoint_primary }}"
+matrix_client_thirdroom_container_labels_traefik_tls_certResolver: "{{ devture_traefik_certResolver_primary }}"
+
+matrix_client_thirdroom_default_hs_url: "{{ matrix_homeserver_url }}"
+matrix_client_thirdroom_default_is_url: "{{ matrix_identity_server_url }}"
+
+# Use Dimension if enabled, otherwise fall back to Scalar
+matrix_client_thirdroom_integrations_ui_url: "{{ matrix_dimension_integrations_ui_url if matrix_dimension_enabled else 'https://scalar.vector.im/' }}"
+matrix_client_thirdroom_integrations_rest_url: "{{ matrix_dimension_integrations_rest_url if matrix_dimension_enabled else 'https://scalar.vector.im/api' }}"
+matrix_client_thirdroom_integrations_widgets_urls: "{{ matrix_dimension_integrations_widgets_urls if matrix_dimension_enabled else ['https://scalar.vector.im/api'] }}"
+matrix_client_thirdroom_integrations_jitsi_widget_url: "{{ matrix_dimension_integrations_jitsi_widget_url if matrix_dimension_enabled else 'https://scalar.vector.im/api/widgets/jitsi.html' }}"
+
+matrix_client_thirdroom_self_check_validate_certificates: "{{ false if matrix_playbook_ssl_retrieval_method == 'self-signed' else true }}"
+
+matrix_client_thirdroom_registration_enabled: "{{ matrix_synapse_enable_registration }}"
+
+matrix_client_thirdroom_enable_presence_by_hs_url: |
+  {{
+    none
+    if matrix_synapse_presence_enabled
+    else {matrix_client_thirdroom_default_hs_url: false}
+  }}
+
+matrix_client_thirdroom_welcome_user_id: ~
+
+matrix_client_thirdroom_jitsi_preferredDomain: "{{ matrix_server_fqn_jitsi if jitsi_enabled else '' }}"
+
+######################################################################
+#
+# /matrix-client-thirdroom
 #
 ######################################################################
 

@@ -1,0 +1,26 @@
+---
+
+- tags:
+    - setup-all
+    - setup-client-thirdroom
+    - install-all
+    - install-client-thirdroom
+  block:
+    - when: matrix_client_thirdroom_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
+
+    - when: matrix_client_thirdroom_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/setup_install.yml"
+
+- tags:
+    - setup-all
+    - setup-client-thirdroom
+  block:
+    - when: not matrix_client_thirdroom_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/setup_uninstall.yml"
+
+- tags:
+    - self-check
+  block:
+    - when: matrix_client_thirdroom_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/self_check.yml"

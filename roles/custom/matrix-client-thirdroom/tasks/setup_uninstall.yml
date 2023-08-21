@@ -1,0 +1,25 @@
+---
+
+- name: Check existence of matrix-client-thirdroom.service
+  ansible.builtin.stat:
+    path: "{{ devture_systemd_docker_base_systemd_path }}/matrix-client-thirdroom.service"
+  register: matrix_client_thirdroom_service_stat
+
+- when: matrix_client_thirdroom_service_stat.stat.exists | bool
+  block:
+    - name: Ensure matrix-client-thirdroom is stopped
+      ansible.builtin.service:
+        name: matrix-client-thirdroom
+        state: stopped
+        enabled: false
+        daemon_reload: true
+
+    - name: Ensure matrix-client-thirdroom.service doesn't exist
+      ansible.builtin.file:
+        path: "{{ devture_systemd_docker_base_systemd_path }}/matrix-client-thirdroom.service"
+        state: absent
+
+    - name: Ensure Thirdroom path doesn't exist
+      ansible.builtin.file:
+        path: "{{ matrix_client_thirdroom_data_path }}"
+        state: absent
